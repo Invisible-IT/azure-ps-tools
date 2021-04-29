@@ -1,0 +1,226 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "adminUsername": {
+            "type": "string",
+            "metadata": {
+                "description": "Username for the Virtual Machine."
+            }
+        },
+        "adminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Password for the Virtual Machine."
+            }
+        }
+    },
+    "variables": {
+        "testResourceGroupName": "INVISIBLEIT-TEST-LINUX-VM-RG",
+        "testLocation": "northeurope",
+        "testResourceGroupDeploymentName": "test-linux-vm-deployment"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Resources/resourceGroups",
+            "apiVersion": "2018-05-01",
+            "location": "[variables('testLocation')]",
+            "name": "[variables('testResourceGroupName')]",
+            "properties": {}
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2020-06-01",
+            "name": "[variables('testResourceGroupDeploymentName')]",
+            "resourceGroup": "[variables('testResourceGroupName')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/resourceGroups/', variables('testResourceGroupName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "expressionEvaluationOptions": {
+                    "scope": "inner"
+                },
+                "parameters": {
+                    "adminUsername": {
+                        "value": "[parameters('adminUsername')]"
+                    },
+                    "adminPassword": {
+                        "value": "[parameters('adminPassword')]"
+                    }
+                },
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "adminUsername": {
+                            "type": "string",
+                            "metadata": {
+                                "description": "Username for the Virtual Machine."
+                            }
+                        },
+                        "adminPassword": {
+                            "type": "securestring",
+                            "metadata": {
+                                "description": "Password for the Virtual Machine."
+                            }
+                        }
+                    },
+                    "variables": {
+                        "vnetName": "test-vnet",
+                        "vnetAddressPrefix": "10.1.0.0/16",
+                        "vnetSubnetName": "test-vnet-subnet",
+                        "vnetSubnetAddressPrefix": "10.1.0.0/24",
+                        "vmName": "test-vm",
+                        "vmOsDiskName": "test-vm-osdisk",
+                        "vmNetworkInterfaceName": "test-vm-nic",
+                        "vmNetworkInterfaceSecurityGroupName": "test-vm-nic-nsg",
+                        "vmNetworkInterfacePublicIPName": "test-vm-nic-pip",
+                        "vmNetworkInterfacePublicIPDNSPrefix": "[toLower(concat('test-linux-vm-', uniqueString(resourceGroup().id)))]",
+                        "location": "[resourceGroup().location]"
+                    },
+                    "resources": [
+                        {
+                            "type": "Microsoft.Network/networkInterfaces",
+                            "apiVersion": "2020-06-01",
+                            "name": "[variables('vmNetworkInterfaceName')]",
+                            "location": "[variables('location')]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.Network/networkSecurityGroups/', variables('vmNetworkInterfaceSecurityGroupName'))]",
+                                "[resourceId('Microsoft.Network/virtualNetworks/', variables('vnetName'))]",
+                                "[resourceId('Microsoft.Network/publicIpAddresses/', variables('vmNetworkInterfacePublicIPName'))]"
+                            ],
+                            "properties": {
+                                "ipConfigurations": [
+                                    {
+                                        "name": "ipconfig1",
+                                        "properties": {
+                                            "subnet": {
+                                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), variables('vnetSubnetName'))]"
+                                            },
+                                            "privateIPAllocationMethod": "Dynamic",
+                                            "publicIpAddress": {
+                                                "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('vmNetworkInterfacePublicIPName'))]"
+                                            }
+                                        }
+                                    }
+                                ],
+                                "networkSecurityGroup": {
+                                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups',variables('vmNetworkInterfaceSecurityGroupName'))]"
+                                }
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Network/networkSecurityGroups",
+                            "apiVersion": "2020-06-01",
+                            "name": "[variables('vmNetworkInterfaceSecurityGroupName')]",
+                            "location": "[variables('location')]",
+                            "properties": {
+                                "securityRules": [
+                                    {
+                                        "name": "SSH",
+                                        "properties": {
+                                            "priority": 1000,
+                                            "protocol": "TCP",
+                                            "access": "Allow",
+                                            "direction": "Inbound",
+                                            "sourceAddressPrefix": "*",
+                                            "sourcePortRange": "*",
+                                            "destinationAddressPrefix": "*",
+                                            "destinationPortRange": "22"
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Network/virtualNetworks",
+                            "apiVersion": "2020-06-01",
+                            "name": "[variables('vnetName')]",
+                            "location": "[variables('location')]",
+                            "properties": {
+                                "addressSpace": {
+                                    "addressPrefixes": [
+                                        "[variables('vnetAddressPrefix')]"
+                                    ]
+                                },
+                                "subnets": [
+                                    {
+                                        "name": "[variables('vnetSubnetName')]",
+                                        "properties": {
+                                            "addressPrefix": "[variables('vnetSubnetAddressPrefix')]",
+                                            "privateEndpointNetworkPolicies": "Enabled",
+                                            "privateLinkServiceNetworkPolicies": "Enabled"
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Network/publicIpAddresses",
+                            "apiVersion": "2020-06-01",
+                            "name": "[variables('vmNetworkInterfacePublicIPName')]",
+                            "location": "[variables('location')]",
+                            "sku": {
+                                "name": "Basic",
+                                "tier": "Regional"
+                            },
+                            "properties": {
+                                "publicIpAllocationMethod": "Dynamic",
+                                "publicIPAddressVersion": "IPv4",
+                                "dnsSettings": {
+                                    "domainNameLabel": "[variables('vmNetworkInterfacePublicIPDNSPrefix')]"
+                                },
+                                "idleTimeoutInMinutes": 4
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Compute/virtualMachines",
+                            "apiVersion": "2020-06-01",
+                            "name": "[variables('vmName')]",
+                            "location": "[variables('location')]",
+                            "dependsOn": [
+                                "[resourceId('Microsoft.Network/networkInterfaces/', variables('vmNetworkInterfaceName'))]"
+                            ],
+                            "properties": {
+                                "hardwareProfile": {
+                                    "vmSize": "Standard_B2s"
+                                },
+                                "storageProfile": {
+                                    "osDisk": {
+                                        "osType": "Linux",
+                                        "name": "[variables('vmOsDiskName')]",
+                                        "createOption": "fromImage",
+                                        "managedDisk": {
+                                            "storageAccountType": "Standard_LRS"
+                                        }
+                                    },
+                                    "imageReference": {
+                                        "publisher": "Canonical",
+                                        "offer": "UbuntuServer",
+                                        "sku": "18.04-LTS",
+                                        "version": "latest"
+                                    }
+                                },
+                                "networkProfile": {
+                                    "networkInterfaces": [
+                                        {
+                                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNetworkInterfaceName'))]"
+                                        }
+                                    ]
+                                },
+                                "osProfile": {
+                                    "computerName": "[variables('vmName')]",
+                                    "adminUsername": "[parameters('adminUsername')]",
+                                    "adminPassword": "[parameters('adminPassword')]"
+                                }
+                            }
+                        }
+                    ],
+                    "outputs": {}
+                }
+            }
+        }
+    ],
+    "outputs": {}
+}
